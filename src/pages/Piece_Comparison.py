@@ -132,6 +132,7 @@ for name in files:
 
 clean_dates = [date[:26] for date in dates]
 corners = ['First Post','Grassy','Ditton']
+x_axis = ['Stroke Count', 'Piece Time (s)', 'Piece Distance (m)']
 # The below line was meant to show outing dates in the dropdown in order but since the csv files are not read in order,
 # it messes up the reading of the csv. The wrong date is shown for a given csv.
 sorted_dates = sorted(dates, key=lambda v: (datetime.datetime.strptime(v[4:10], '%d %b'), datetime.datetime.strptime(v[18:26], '%H:%M %p')))
@@ -164,7 +165,10 @@ layout = html.Div([
     dcc.Checklist(id='piece_selection', options=[]),
     html.P(id='err', style={'color': 'red'}),
     html.Hr(),
-    html.Div(['Split range for plot:', dcc.RangeSlider(90, 150, 5, count=1, value=[110, 130], id="split_range")]),
+    html.P(children="Plot against:",
+               className="header-description"),
+    dcc.Dropdown(options=x_axis, value=x_axis[-1], id='x_axis', placeholder='Select variable to plot against', clearable=False),
+    html.Div(['Split range for plot:', dcc.RangeSlider(60, 180, 5, count=1, value=[110, 130], id="split_range")]),
     html.Div(['Rate range for plot:', dcc.RangeSlider(15, 50, 1, count=1, value=[24, 40], id="rate_range")]),
     dcc.Graph(id="piece_figure"),
     html.P("Add benchmark lines for split and rate"),
@@ -221,7 +225,7 @@ def piece_prompts(outings, pcrate, strcount):
         df1 = df_past_gr_dr.loc[df_past_gr_dr['Stroke Rate'] >= rate]
         list_of_df = np.split(df1, np.flatnonzero(np.diff(df1['Total Strokes']) != 1) + 1)
         list_of_pieces = [piece for piece in list_of_df if len(piece) >= stroke_count]
-        list_of_pieces = [i for i in list_of_pieces if i['Split (GPS)'].mean() <= 150]
+        # list_of_pieces = [i for i in list_of_pieces if i['Split (GPS)'].mean() <= 250]
         piece_list.extend(list_of_pieces)
         for count, piece in enumerate(list_of_pieces):
             # stroke_count =
@@ -252,10 +256,11 @@ def piece_prompts(outings, pcrate, strcount):
           Input('rate_bench', 'value'),
           Input('store_pieces', 'data'),
           Input('piece_selection', 'options'),
-          Input('select_corner', 'value')
+          Input('select_corner', 'value'),
+          Input('x_axis', 'value'),
           )
 def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench, rate_bench, store_pieces,
-               prompt, corner):
+               prompt, corner, x_axis):
     list_of_pieces = [pd.DataFrame.from_dict(i) for i in store_pieces]
     pieces.sort(key=lambda v: (datetime.datetime.strptime(v[:6], '%d %b'), int(v.split("Piece ")[1][:2])))
     pieces_to_plot = [list_of_pieces[i] for i in [prompt.index(i) for i in pieces]]
