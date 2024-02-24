@@ -192,7 +192,11 @@ layout = html.Div([
               'Burns:',
               dcc.Input(id="burns",
                         type='number', value=10,
-                        placeholder="No of burns", )
+                        placeholder="No of burns", ),
+              'Swings:',
+              dcc.Input(id="swings",
+                        type='number', value=10,
+                        placeholder="No of swings", )
               ], style={'display': 'inline-block'}),
     html.Div([dash_table.DataTable(data=[], id='start_comp', export_format='csv')],
              style={'width': '40%', }, className="dbc"),
@@ -252,6 +256,7 @@ def piece_prompts(outings, pcrate, strcount):
           Input('draws', 'value'),
           Input("winds", "value"),
           Input('burns', 'value'),
+          Input('swings', 'value'),
           Input("split_bench", "value"),
           Input('rate_bench', 'value'),
           Input('store_pieces', 'data'),
@@ -259,7 +264,7 @@ def piece_prompts(outings, pcrate, strcount):
           Input('select_corner', 'value'),
           Input('x_axis', 'value'),
           )
-def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench, rate_bench, store_pieces,
+def piece_list(pieces, split_range, rate_range, draws, winds, burns, swings, split_bench, rate_bench, store_pieces,
                prompt, corner, x_axis):
     list_of_pieces = [pd.DataFrame.from_dict(i) for i in store_pieces]
     pieces.sort(key=lambda v: (datetime.datetime.strptime(v[:6], '%d %b'), int(v.split("Piece ")[1][:2])))
@@ -267,7 +272,7 @@ def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench
 
     colors = px.colors.qualitative.Antique
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        vertical_spacing=0.05, x_title='Distance (m)')
+                        vertical_spacing=0.05, x_title=x_axis)
 
     for x, (i, title) in enumerate(zip(pieces_to_plot, pieces)):
         piece_data = i
@@ -282,10 +287,10 @@ def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench
             piece_data['Distance (GPS)'].index]
         piece_data = piece_data.rename(columns={'Elapsed Time': 'Outing Time', 'Distance (GPS)': 'Outing Distance'})
         data = piece_data
-        fig.add_trace(go.Scatter(x=data['Piece Distance (m)'], y=data['Split (GPS)'], hovertemplate='%{text}',
+        fig.add_trace(go.Scatter(x=data[x_axis], y=data['Split (GPS)'], hovertemplate='%{text}',
                                  text=['{}'.format(data['Split'].iloc[x]) for x, y in enumerate(data.index)],
                                  name=title[:title.find(' :')].strip(), mode='lines', line=dict(color=colors[x]), legendrank=x), row=1, col=1)
-        fig.add_trace(go.Scatter(x=data['Piece Distance (m)'], y=data['Stroke Rate'], hovertemplate='%{text}',
+        fig.add_trace(go.Scatter(x=data[x_axis], y=data['Stroke Rate'], hovertemplate='%{text}',
                                  text=['{}'.format(data['Stroke Rate'].iloc[x]) for x, y in enumerate(data.index)],
                                  name=title[:title.find(' :')].strip(), mode='lines', line=dict(color=colors[x]), showlegend=False), row=2,
                       col=1)
@@ -319,6 +324,7 @@ def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench
     draws = draws
     winds = winds
     burns = burns
+    swings = swings
 
     for x, i in enumerate(pieces_to_plot):
         piece_data = i
@@ -330,15 +336,17 @@ def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench
         draws_split = piece_data['Split'].iloc[draws - 1]
         winds_split = piece_data['Split'].iloc[draws + winds - 1]
         burns_split = piece_data['Split'].iloc[draws + winds + burns - 1]
+        swings_split = piece_data['Split'].iloc[draws + winds + burns + swings - 1]
         draws_rate = piece_data['Stroke Rate'].iloc[draws - 1]
         winds_rate = piece_data['Stroke Rate'].iloc[draws + winds - 1]
         burns_rate = piece_data['Stroke Rate'].iloc[draws + winds + burns - 1]
-        column_split = {pieces[x][:15]: [draws_split, winds_split, burns_split]}
-        column_rate = {pieces[x][:15]: [draws_rate, winds_rate, burns_rate]}
+        swings_rate = piece_data['Stroke Rate'].iloc[draws + winds + burns + swings - 1]
+        column_split = {pieces[x][:15]: [draws_split, winds_split, burns_split, swings_split]}
+        column_rate = {pieces[x][:15]: [draws_rate, winds_rate, burns_rate, swings_rate]}
         columns_split.update(column_split)
         columns_rate.update(column_rate)
-    sp = pd.DataFrame(data=columns_split, index=['Draws', 'Winds', 'Burns'])
-    ra = pd.DataFrame(data=columns_rate, index=['Draws', 'Winds', 'Burns'])
+    sp = pd.DataFrame(data=columns_split, index=['Draws', 'Winds', 'Burns', 'Swings'])
+    ra = pd.DataFrame(data=columns_rate, index=['Draws', 'Winds', 'Burns', 'Swings'])
     df = pd.concat([sp, ra], keys=['Split after:', 'Rate after:'])
     df = df.reset_index()
     df.loc[df['level_0'].duplicated(), 'level_0'] = ''
@@ -350,6 +358,8 @@ def piece_list(pieces, split_range, rate_range, draws, winds, burns, split_bench
                   line_width=0, fillcolor="yellow", opacity=0.2)
     fig.add_vrect(x0=draws + winds, x1=draws + winds + burns, annotation_text="Burns",
                   annotation_position='bottom left', row='all', line_width=0, fillcolor="red", opacity=0.2)
+    fig.add_vrect(x0=draws + winds + burns, x1=draws + winds + burns + swings, annotation_text="Swings",
+                      annotation_position='bottom left', row='all', line_width=0, fillcolor="blue", opacity=0.2)
     fig.update_traces(xaxis='x2')
 
     graphs = []
